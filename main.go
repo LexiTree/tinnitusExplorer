@@ -20,6 +20,7 @@ import (
 
 const sampleRate = 44100
 const bufferSize = 64
+
 const sinMinVal = 150
 const sinMaxVal = 14000
 const sinRatio = sinMaxVal / sinMinVal
@@ -40,7 +41,7 @@ var (
 	sineToneFreqFine         = 0.5
 	sineToneOff              = 0.0
 
-	sinTime = 0.0
+	sineTime = 0.0
 )
 
 type AGC struct {
@@ -258,12 +259,12 @@ func audioCallbackStereo(out []float32) {
 		}
 
 		if atomic.LoadInt32(&sineToneOn) == 1 {
-			sample := math.Sin(sinTime + (2 * math.Pi * (sineToneOff / 100)))
+			sample := math.Sin(sineTime + (2 * math.Pi * (sineToneOff / 100)))
 			sample = sineAGC.ProcessSample(sample)
 
-			sinTime += 2 * math.Pi * (sineToneFreqCoarse + sineToneFreqFine) / sampleRate
-			if sinTime > 2*math.Pi {
-				sinTime -= 2 * math.Pi
+			sineTime += 2 * math.Pi * (sineToneFreqCoarse + sineToneFreqFine) / sampleRate
+			if sineTime > 2*math.Pi {
+				sineTime -= 2 * math.Pi
 			}
 
 			l, r := circularPan(sample, math.Float64frombits(atomic.LoadUint64((*uint64)(unsafe.Pointer(&sineTonePan)))))
