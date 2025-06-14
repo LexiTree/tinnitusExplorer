@@ -80,7 +80,7 @@ func (a *AGC) ProcessSample(sample float64) float64 {
 }
 
 var whiteAGC = NewAGC(0.5)
-var pinkAGC = NewAGC(0.5)
+var pinkAGC = NewAGC(0.66)
 var sineAGC = NewAGC(0.5)
 
 func main() {
@@ -185,15 +185,39 @@ func main() {
 		sineToneFreqCoarseLabel.Refresh()
 	})
 
-	/*
-		sineToneFreqFineLabel := widget.NewLabel("")
-		sineToneFreqSliderFine := makeSlider(func(value float64) {
-			update := value
-			atomic.StoreUint64((*uint64)(unsafe.Pointer(&sineToneFreqFine)), math.Float64bits(update))
-			sineToneFreqFineLabel.Text = fmt.Sprintf("Fine Hertz: %0.0f", update)
-			sineToneFreqFineLabel.Refresh()
-		})
-	*/
+	sineToneFreqFineLabel := widget.NewLabel("")
+	sineToneFreqSliderFine := makeSlider(func(value float64) {
+
+		s := sineToneFreqSliderCoarse.Value
+
+		var a, b, c float64
+		if s == 0 {
+			a = sinMinVal * math.Pow(sinRatio, 0/100.0)
+			b = sinMinVal * math.Pow(sinRatio, 1/100.0)
+			c = sinMinVal * math.Pow(sinRatio, 2/100.0)
+		} else if s == 100 {
+			a = sinMinVal * math.Pow(sinRatio, 98/100.0)
+			b = sinMinVal * math.Pow(sinRatio, 99/100.0)
+			c = sinMinVal * math.Pow(sinRatio, 100/100.0)
+		} else {
+			a = sinMinVal * math.Pow(sinRatio, (s-1)/100.0)
+			b = sinMinVal * math.Pow(sinRatio, s/100.0)
+			c = sinMinVal * math.Pow(sinRatio, (s+1)/100.0)
+		}
+
+		var update float64
+		if value < 50 {
+			update -= (value / 100.0) * (b - a)
+		} else if value > 50 {
+			update += (value / 100.0) * (c - b)
+		} else {
+			update = 0
+		}
+
+		atomic.StoreUint64((*uint64)(unsafe.Pointer(&sineToneFreqFine)), math.Float64bits(update))
+		sineToneFreqFineLabel.Text = fmt.Sprintf("Hertz: %0.0f", sineToneFreqCoarse+update)
+		sineToneFreqFineLabel.Refresh()
+	})
 
 	whiteNoiseContent := widget.NewCard("White Noise Controls", "",
 		container.NewBorder(nil, nil, whiteNoiseToggle, nil,
@@ -213,6 +237,7 @@ func main() {
 			sineToneVolLabel, sineToneVolSlider,
 			sineToneOffLabel, sineToneOffSlider,
 			sineToneFreqCoarseLabel, sineToneFreqSliderCoarse,
+			sineToneFreqFineLabel, sineToneFreqSliderFine,
 		)))
 
 	myWindow.SetContent(container.NewVBox(whiteNoiseContent, pinkNoiseContent, sineToneContent, quitButton))
