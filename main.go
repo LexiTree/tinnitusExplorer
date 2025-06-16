@@ -177,16 +177,19 @@ func main() {
 		sineToneOffLabel.Refresh()
 	})
 
-	sineToneFreqCoarseLabel := widget.NewLabel("")
-	sineToneFreqSliderCoarse := makeSlider(func(value float64) {
+	var sineToneFreqSliderCoarse, sineToneFreqSliderFine *widget.Slider
+	sineToneFreqLabel := widget.NewLabel("")
+
+	sineToneFreqSliderCoarse = makeSlider(func(value float64) {
 		update := sinMinVal * math.Pow(sinRatio, value/100.0)
 		atomic.StoreUint64((*uint64)(unsafe.Pointer(&sineToneFreqCoarse)), math.Float64bits(update))
-		sineToneFreqCoarseLabel.Text = fmt.Sprintf("Hertz: %0.0f", update)
-		sineToneFreqCoarseLabel.Refresh()
+
+		if sineToneFreqSliderFine != nil {
+			sineToneFreqSliderFine.OnChanged(sineToneFreqSliderFine.Value)
+		}
 	})
 
-	sineToneFreqFineLabel := widget.NewLabel("")
-	sineToneFreqSliderFine := makeSlider(func(value float64) {
+	sineToneFreqSliderFine = makeSlider(func(value float64) {
 
 		s := sineToneFreqSliderCoarse.Value
 
@@ -205,6 +208,8 @@ func main() {
 			c = sinMinVal * math.Pow(sinRatio, (s+1)/100.0)
 		}
 
+		t := b
+
 		var update float64
 
 		// remember, it is as if 0-49 is a 0-100 slider, and 51-100 is also a 0-100 slider
@@ -217,8 +222,8 @@ func main() {
 		}
 
 		atomic.StoreUint64((*uint64)(unsafe.Pointer(&sineToneFreqFine)), math.Float64bits(update))
-		sineToneFreqFineLabel.Text = fmt.Sprintf("Hertz: %0.0f", sineToneFreqCoarse+update)
-		sineToneFreqFineLabel.Refresh()
+		sineToneFreqLabel.Text = fmt.Sprintf("Hertz: %0.0f", t+update)
+		sineToneFreqLabel.Refresh()
 	})
 
 	whiteNoiseContent := widget.NewCard("White Noise Controls", "",
@@ -238,9 +243,7 @@ func main() {
 			container.NewStack(labelSpacer, sineTonePanLabel), sineTonePanSlider,
 			sineToneVolLabel, sineToneVolSlider,
 			sineToneOffLabel, sineToneOffSlider,
-			sineToneFreqCoarseLabel, sineToneFreqSliderCoarse,
-			sineToneFreqFineLabel, sineToneFreqSliderFine,
-		)))
+			sineToneFreqLabel, container.NewVBox(sineToneFreqSliderCoarse, sineToneFreqSliderFine))))
 
 	myWindow.SetContent(container.NewVBox(whiteNoiseContent, pinkNoiseContent, sineToneContent,
 		quitButton))
