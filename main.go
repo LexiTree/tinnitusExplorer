@@ -206,10 +206,12 @@ func main() {
 		}
 
 		var update float64
+
+		// remember, it is as if 0-49 is a 0-100 slider, and 51-100 is also a 0-100 slider
 		if value < 50 {
-			update -= (value / 100.0) * (b - a)
+			update -= ((100 - (value * 2)) / 100.0) * (b - a)
 		} else if value > 50 {
-			update += (value / 100.0) * (c - b)
+			update += (((value - 50) * 2) / 100.0) * (c - b)
 		} else {
 			update = 0
 		}
@@ -240,7 +242,8 @@ func main() {
 			sineToneFreqFineLabel, sineToneFreqSliderFine,
 		)))
 
-	myWindow.SetContent(container.NewVBox(whiteNoiseContent, pinkNoiseContent, sineToneContent, quitButton))
+	myWindow.SetContent(container.NewVBox(whiteNoiseContent, pinkNoiseContent, sineToneContent,
+		quitButton))
 
 	stream, err := portaudio.OpenDefaultStream(0, 2, sampleRate, bufferSize, audioCallbackStereo)
 	if err != nil {
