@@ -10,9 +10,11 @@ import (
 	"math"
 	"sync/atomic"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 	"github.com/gordonklaus/portaudio"
@@ -21,8 +23,8 @@ import (
 const sampleRate = 44100
 const bufferSize = 64
 
-const sinMinVal = 150
-const sinMaxVal = 14000
+const sinMinVal = 250
+const sinMaxVal = 12750
 const sinRatio = sinMaxVal / sinMinVal
 
 var (
@@ -56,8 +58,8 @@ func NewAGC(target float64) *AGC {
 	return &AGC{
 		targetLevel: target,
 		currentGain: 1.0,
-		attack:      0.01,   // fast response to loudness
-		decay:       0.0005, // slow recovery
+		attack:      0.005,  // loudness cutoff
+		decay:       0.0005, // eventual backoff
 	}
 }
 
@@ -80,38 +82,65 @@ func (a *AGC) ProcessSample(sample float64) float64 {
 }
 
 var whiteAGC = NewAGC(0.5)
-var pinkAGC = NewAGC(0.66)
+var pinkAGC = NewAGC(0.5)
 var sineAGC = NewAGC(0.5)
 
-func main() {
-
-	portaudio.Initialize()
-	defer portaudio.Terminate()
-
+func ui_main() {
 	myApp := app.New()
 	myWindow := myApp.NewWindow("Tinnitus Explorer")
 
 	toggleSpacer := canvas.NewText(strings.Repeat("W", 10), color.Transparent)
 	labelSpacer := canvas.NewText(strings.Repeat("W", 10), color.Transparent)
 
-	quitButton := widget.NewButton("Quit", func() {
+	quitButton := widget.NewButton("Quit (ALT+Q)", func() {
 		myApp.Quit()
 	})
 
-	whiteNoiseToggle := container.NewStack(toggleSpacer,
-		widget.NewCheck("White Noise", func(checked bool) {
-			atomic.StoreInt32(&whiteNoiseOn, 1-atomic.LoadInt32(&whiteNoiseOn))
-		}))
+	myWindow.Canvas().AddShortcut(&desktop.CustomShortcut{
+		KeyName:  fyne.KeyQ,
+		Modifier: fyne.KeyModifierAlt},
+		func(shortcut fyne.Shortcut) {
+			myApp.Quit()
+		})
 
-	pinkNoiseToggle := container.NewStack(toggleSpacer,
-		widget.NewCheck("Pink Noise", func(checked bool) {
-			atomic.StoreInt32(&pinkNoiseOn, 1-atomic.LoadInt32(&pinkNoiseOn))
-		}))
+	whiteNoiseCheck := widget.NewCheck("White Noise (ALT+W)", func(checked bool) {
+		atomic.StoreInt32(&whiteNoiseOn, 1-atomic.LoadInt32(&whiteNoiseOn))
+	})
 
-	sineToneToggle := container.NewStack(toggleSpacer,
-		widget.NewCheck("Sine Tone", func(checked bool) {
-			atomic.StoreInt32(&sineToneOn, 1-atomic.LoadInt32(&sineToneOn))
-		}))
+	whiteNoiseToggle := container.NewStack(toggleSpacer, whiteNoiseCheck)
+
+	myWindow.Canvas().AddShortcut(&desktop.CustomShortcut{
+		KeyName:  fyne.KeyW,
+		Modifier: fyne.KeyModifierAlt},
+		func(shortcut fyne.Shortcut) {
+			whiteNoiseCheck.SetChecked(!whiteNoiseCheck.Checked)
+		})
+
+	pinkNoiseCheck := widget.NewCheck("Pink Noise (ALT+P)", func(checked bool) {
+		atomic.StoreInt32(&pinkNoiseOn, 1-atomic.LoadInt32(&pinkNoiseOn))
+	})
+
+	pinkNoiseToggle := container.NewStack(toggleSpacer, pinkNoiseCheck)
+
+	myWindow.Canvas().AddShortcut(&desktop.CustomShortcut{
+		KeyName:  fyne.KeyP,
+		Modifier: fyne.KeyModifierAlt},
+		func(shortcut fyne.Shortcut) {
+			pinkNoiseCheck.SetChecked(!pinkNoiseCheck.Checked)
+		})
+
+	sineNoiseCheck := widget.NewCheck("Sine Tone (ALT+S)", func(checked bool) {
+		atomic.StoreInt32(&sineToneOn, 1-atomic.LoadInt32(&sineToneOn))
+	})
+
+	sineToneToggle := container.NewStack(toggleSpacer, sineNoiseCheck)
+
+	myWindow.Canvas().AddShortcut(&desktop.CustomShortcut{
+		KeyName:  fyne.KeyS,
+		Modifier: fyne.KeyModifierAlt},
+		func(shortcut fyne.Shortcut) {
+			sineNoiseCheck.SetChecked(!sineNoiseCheck.Checked)
+		})
 
 	makeSlider := func(onChanged func(float64)) *widget.Slider {
 		newSlider := widget.NewSlider(0, 100)
@@ -189,24 +218,18 @@ func main() {
 		}
 	})
 
+	sineToneFreqSliderCoarse.Min = 1
+	sineToneFreqSliderCoarse.Max = 99
+
 	sineToneFreqSliderFine = makeSlider(func(value float64) {
 
 		s := sineToneFreqSliderCoarse.Value
 
 		var a, b, c float64
-		if s == 0 {
-			a = sinMinVal * math.Pow(sinRatio, 0/100.0)
-			b = sinMinVal * math.Pow(sinRatio, 1/100.0)
-			c = sinMinVal * math.Pow(sinRatio, 2/100.0)
-		} else if s == 100 {
-			a = sinMinVal * math.Pow(sinRatio, 98/100.0)
-			b = sinMinVal * math.Pow(sinRatio, 99/100.0)
-			c = sinMinVal * math.Pow(sinRatio, 100/100.0)
-		} else {
-			a = sinMinVal * math.Pow(sinRatio, (s-1)/100.0)
-			b = sinMinVal * math.Pow(sinRatio, s/100.0)
-			c = sinMinVal * math.Pow(sinRatio, (s+1)/100.0)
-		}
+
+		a = sinMinVal * math.Pow(sinRatio, (s-1)/100.0)
+		b = sinMinVal * math.Pow(sinRatio, s/100.0)
+		c = sinMinVal * math.Pow(sinRatio, (s+1)/100.0)
 
 		t := b
 
@@ -248,6 +271,15 @@ func main() {
 	myWindow.SetContent(container.NewVBox(whiteNoiseContent, pinkNoiseContent, sineToneContent,
 		quitButton))
 
+	myWindow.ShowAndRun()
+
+}
+
+func main() {
+
+	portaudio.Initialize()
+	defer portaudio.Terminate()
+
 	stream, err := portaudio.OpenDefaultStream(0, 2, sampleRate, bufferSize, audioCallbackStereo)
 	if err != nil {
 		panic(err)
@@ -257,8 +289,7 @@ func main() {
 	stream.Start()
 	defer stream.Stop()
 
-	myWindow.ShowAndRun()
-
+	ui_main()
 }
 
 func audioCallbackStereo(out []float32) {
