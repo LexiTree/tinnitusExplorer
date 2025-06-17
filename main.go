@@ -21,7 +21,6 @@ import (
 )
 
 const sampleRate = 44100
-const bufferSize = 64
 
 const sinMinVal = 250
 const sinMaxVal = 12750
@@ -280,7 +279,7 @@ func main() {
 	portaudio.Initialize()
 	defer portaudio.Terminate()
 
-	stream, err := portaudio.OpenDefaultStream(0, 2, sampleRate, bufferSize, audioCallbackStereo)
+	stream, err := portaudio.OpenDefaultStream(0, 2, sampleRate, 0, audioCallbackStereo)
 	if err != nil {
 		panic(err)
 	}
